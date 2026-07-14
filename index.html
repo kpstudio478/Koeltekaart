@@ -764,6 +764,25 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
 
   .map-wrap { position:relative; border-radius: 16px; overflow:hidden; border: 1px solid var(--line); }
+  .search-row { display:flex; gap:10px; margin-bottom: 14px; flex-wrap: wrap; }
+  #search-box {
+    flex: 1; min-width: 220px;
+    padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink); font-size: 13.5px;
+  }
+  #province-select {
+    padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink); font-size: 13.5px;
+  }
+  #results-count { color: var(--muted); font-size: 12.5px; margin: 16px 2px 6px; }
+  #results-list { display:grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-bottom: 8px; }
+  .result-card {
+    text-align: left; border: 1px solid var(--line); background: var(--panel);
+    border-radius: 12px; padding: 12px 14px; cursor:pointer; font-family: inherit;
+  }
+  .result-card:hover { border-color: var(--forest); }
+  .result-card .r-name { font-weight: 600; font-size: 13.5px; margin-bottom: 2px; }
+  .result-card .r-meta { font-size: 11.5px; color: var(--muted); }
   #map { height: 560px; width:100%; background: #dfe7d8; }
   #legend {
     position:absolute; bottom: 14px; left: 14px; z-index: 500;
@@ -775,7 +794,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .leaflet-popup-content-wrapper { border-radius: 10px; }
   .popup-title { font-weight:600; font-size:14px; margin-bottom:3px; }
   .popup-type { font-size:11.5px; color: var(--muted); margin-bottom:6px; }
-  .popup-desc { font-size:12.5px; line-height:1.4; }
+  .popup-desc { font-size:12.5px; line-height:1.4; margin-bottom: 8px; }
+  .popup-mechanism { font-size:12px; color: var(--forest); margin-bottom: 6px; }
+  .popup-tip { font-size:12px; line-height:1.4; color: var(--muted); border-top: 1px solid var(--line); padding-top: 7px; }
 
   /* ---------- About / privacy ---------- */
   section.info { max-width: 780px; margin: 0 auto; padding: 56px 32px; }
@@ -832,7 +853,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
 <section class="map-section" id="kaart">
   <h2>Waar is het koeler?</h2>
-  <p class="sub">Klik op een gebied voor meer informatie. Gebruik de filters om een categorie te verbergen of te tonen.</p>
+  <p class="sub">Zoek op naam of provincie, of klik op een gebied voor meer informatie. Gebruik de filters om een categorie te verbergen of te tonen.</p>
+  <div class="search-row">
+    <input type="text" id="search-box" placeholder="Zoek op naam, plaats of provincie…" />
+    <select id="province-select">
+      <option value="alle">Alle provincies</option>
+    </select>
+  </div>
   <div id="filters"></div>
   <div class="map-wrap">
     <div id="map"></div>
@@ -843,12 +870,21 @@ svg.leaflet-image-layer.leaflet-interactive path {
       <div class="row"><span class="dot" style="background:#A9762F"></span> Duingebied</div>
     </div>
   </div>
+  <div id="results-count"></div>
+  <div id="results-list"></div>
 </section>
 
 <section class="info" id="over">
   <h2>Over deze kaart</h2>
   <p>Deze kaart toont op een bewust laag detailniveau grote bos-, duin- en watergebieden in Nederland: plekken die door begroeiing, schaduw of open water doorgaans een lagere gevoelstemperatuur hebben dan bebouwd gebied. De gebieden zijn illustratief ingetekend (geen exacte grenzen) en bedoeld als algemene indicatie, niet als officiële hitte- of schaduwmeting.</p>
   <p>Voor een gedetailleerd, wetenschappelijk onderbouwd hittebeeld van Nederland verwijzen we naar de <a href="https://www.klimaateffectatlas.nl" target="_blank" rel="noopener">Klimaateffectatlas</a>.</p>
+  <p>Klik op een gebied voor de oppervlakte, het type verkoeling en een praktische tip. We onderscheiden drie manieren waarop een gebied koeler aanvoelt:</p>
+  <ul>
+    <li><strong>❃ Schaduw</strong> — dichte boomkroon houdt zonlicht tegen; typisch voor oude bossen.</li>
+    <li><strong>❉ Verdamping</strong> — open water en moeras koelen de lucht eromheen af.</li>
+    <li><strong>❃❉ Gemengd</strong> — een combinatie van beide, vaak in duingebieden of parken met water én bomen.</li>
+  </ul>
+  <p>Let op: dit zijn algemene kenmerken per gebied, geen actuele metingen. Binnen een groot gebied als de Veluwe kan het op de ene plek (dicht bos) heel anders aanvoelen dan op de andere (open heide).</p>
 </section>
 
 <section class="info" id="privacy">
@@ -886,26 +922,61 @@ svg.leaflet-image-layer.leaflet-interactive path {
 // Voorbeelddata: grote groene/koele gebieden in Nederland (illustratief, geen exacte grenzen)
 // ---------------------------------------------------------------
 const spots = [
-  { name: "Veluwe", type: "bos", lat: 52.20, lng: 5.85, radius: 22000, desc: "Grootste aaneengesloten bos- en heidegebied van Nederland." },
-  { name: "Utrechtse Heuvelrug", type: "bos", lat: 52.05, lng: 5.40, radius: 9000, desc: "Bosrijke stuwwal tussen Utrecht en Amersfoort." },
-  { name: "Drents-Friese Wold", type: "bos", lat: 52.87, lng: 6.28, radius: 8000, desc: "Bos- en heidegebied op de grens van Drenthe en Friesland." },
-  { name: "Sallandse Heuvelrug", type: "bos", lat: 52.40, lng: 6.35, radius: 6000, desc: "Bos en heide in Overijssel." },
-  { name: "Loonse en Drunense Duinen", type: "duin", lat: 51.63, lng: 5.10, radius: 5000, desc: "Bijzonder stuifzandgebied in Noord-Brabant." },
-  { name: "Nationaal Park De Meinweg", type: "bos", lat: 51.16, lng: 6.07, radius: 4500, desc: "Bosgebied in Limburg." },
-  { name: "Maasduinen", type: "duin", lat: 51.48, lng: 6.05, radius: 6000, desc: "Rivierduinen langs de Maas in Limburg." },
-  { name: "Amsterdamse Waterleidingduinen", type: "duin", lat: 52.33, lng: 4.57, radius: 5000, desc: "Duingebied tussen Zandvoort en Noordwijk." },
-  { name: "Kennemerduinen", type: "duin", lat: 52.42, lng: 4.58, radius: 4500, desc: "Duingebied bij Bloemendaal en Overveen." },
-  { name: "Twiske", type: "water", lat: 52.44, lng: 4.90, radius: 3000, desc: "Recreatiegebied met water en groen, ten noorden van Amsterdam." },
-  { name: "Biesbosch", type: "water", lat: 51.75, lng: 4.80, radius: 9000, desc: "Uitgestrekt getijdenmoeras en nationaal park." },
-  { name: "Weerribben-Wieden", type: "water", lat: 52.77, lng: 5.95, radius: 8000, desc: "Laagveenmoeras met plassen in Overijssel." },
-  { name: "Lauwersmeer", type: "water", lat: 53.35, lng: 6.23, radius: 6000, desc: "Groot meer- en natuurgebied tussen Groningen en Friesland." },
-  { name: "Naardermeer", type: "water", lat: 52.30, lng: 5.13, radius: 3000, desc: "Oudste natuurreservaat van Nederland, moeras en water." },
-  { name: "Groote Peel", type: "bos", lat: 51.35, lng: 5.75, radius: 4000, desc: "Hoogveengebied op de grens van Brabant en Limburg." },
-  { name: "Schoorlse Duinen", type: "duin", lat: 52.72, lng: 4.68, radius: 4500, desc: "Bosrijk duingebied in Noord-Holland." },
-  { name: "Speulderbos / Sprielderbos", type: "bos", lat: 52.27, lng: 5.68, radius: 4000, desc: "Oud bosgebied op de Veluwe." },
-  { name: "Amsterdamse Bos", type: "bos", lat: 52.32, lng: 4.83, radius: 2500, desc: "Groot stadsbos ten zuiden van Amsterdam." },
-  { name: "Kralingse Bos", type: "water", lat: 51.93, lng: 4.51, radius: 1800, desc: "Park met grote plas in Rotterdam." },
-  { name: "Haagse Bos / Bezuidenhout", type: "bos", lat: 52.09, lng: 4.32, radius: 1800, desc: "Stadsbos in Den Haag." }
+  { name: "Veluwe", province: "Gelderland", type: "bos", lat: 52.20, lng: 5.85, radius: 22000, size: "± 91.000 ha", mechanism: "schaduw", desc: "Grootste aaneengesloten bos- en heidegebied van Nederland.", tip: "Kies een route onder hoog naaldbos (bijv. bij Otterlo) voor het meeste schaduweffect; open heidevelden warmen juist snel op." },
+  { name: "Speulderbos / Sprielderbos", province: "Gelderland", type: "bos", lat: 52.27, lng: 5.68, radius: 4000, size: "± 1.700 ha", mechanism: "schaduw", desc: "Oud bosgebied op de Veluwe.", tip: "Eeuwenoude, hoge boomkronen zorgen hier voor een van de koelste boswandelingen van de Veluwe." },
+  { name: "Korenburgerveen / Achterhoekse bossen", province: "Gelderland", type: "bos", lat: 51.98, lng: 6.55, radius: 4000, size: "± 250 ha (veen) + omliggend bos", mechanism: "gemengd", desc: "Hoogveenrestant met omringende bossen in de Achterhoek.", tip: "De beboste randen rond het veengebied zijn koeler dan het open middengebied." },
+  { name: "Groesbeekse Heuvelrug", province: "Gelderland", type: "bos", lat: 51.78, lng: 5.95, radius: 4000, size: "± 1.200 ha", mechanism: "schaduw", desc: "Beboste stuwwal bij Nijmegen en Groesbeek.", tip: "De noordhellingen bij Berg en Dal blijven het langst uit de felle middagzon." },
+  { name: "Gelderse Poort", province: "Gelderland", type: "water", lat: 51.87, lng: 6.05, radius: 4500, size: "± 2.700 ha (uiterwaarden)", mechanism: "verdamping", desc: "Rivieruiterwaarden van Rijn en Waal bij de Duitse grens.", tip: "De wisselende waterplassen langs de dijken staan vaak bloot aan wind vanaf de rivier." },
+  { name: "Mookerheide", province: "Gelderland/Limburg", type: "bos", lat: 51.75, lng: 5.88, radius: 3000, size: "± 500 ha", mechanism: "gemengd", desc: "Bos- en heidegebied bij Mook, op de grens van Gelderland en Limburg.", tip: "De bosranden rond het Mookerplasje bieden het meeste comfort op warme dagen." },
+
+  { name: "Utrechtse Heuvelrug", province: "Utrecht", type: "bos", lat: 52.05, lng: 5.40, radius: 9000, size: "± 6.000 ha", mechanism: "schaduw", desc: "Bosrijke stuwwal tussen Utrecht en Amersfoort.", tip: "De hoger gelegen bospaden bij Austerlitz en Amerongen vangen vaak net iets meer wind." },
+  { name: "Loosdrechtse Plassen", province: "Utrecht", type: "water", lat: 52.19, lng: 5.08, radius: 4000, size: "± 2.000 ha", mechanism: "verdamping", desc: "Uitgestrekt plassengebied tussen Hilversum en Loosdrecht.", tip: "Kies een route langs het water aan de luwe (oost)kant voor het meeste verkoelende effect." },
+
+  { name: "Drents-Friese Wold", province: "Drenthe/Friesland", type: "bos", lat: 52.87, lng: 6.28, radius: 8000, size: "± 3.700 ha", mechanism: "schaduw", desc: "Bos- en heidegebied op de grens van Drenthe en Friesland.", tip: "Het Aekingerzand ligt open in de zon; blijf voor verkoeling in de omliggende bosstroken." },
+  { name: "Dwingelderveld", province: "Drenthe", type: "bos", lat: 52.82, lng: 6.38, radius: 5000, size: "± 3.700 ha", mechanism: "gemengd", desc: "Nationaal park met heide, bos en vennen in Drenthe.", tip: "De vennen midden in het gebied zorgen voor lokale verkoeling, ook als de heide zelf warm aanvoelt." },
+  { name: "Norgerholt", province: "Drenthe", type: "bos", lat: 53.09, lng: 6.47, radius: 1200, size: "± 30 ha", mechanism: "schaduw", desc: "Een van de oudste bossen van Drenthe, bij Norg.", tip: "Klein maar dicht bebost — een schaduwrijke tussenstop op een fietsroute door Drenthe." },
+  { name: "Zuidlaardermeer / Drentsche Aa", province: "Drenthe/Groningen", type: "water", lat: 53.13, lng: 6.68, radius: 5000, size: "± 590 ha (meer)", mechanism: "verdamping", desc: "Meer en beekdallandschap in Drenthe/Groningen.", tip: "De beekdalen van de Drentsche Aa bieden schaduw én vocht — koeler dan het omliggende akkerland." },
+
+  { name: "Lauwersmeer", province: "Groningen/Friesland", type: "water", lat: 53.35, lng: 6.23, radius: 6000, size: "± 6.000 ha", mechanism: "verdamping", desc: "Groot meer- en natuurgebied tussen Groningen en Friesland.", tip: "Open water en wind vanaf het meer zorgen hier voor duidelijk lagere temperaturen dan het binnenland." },
+  { name: "Stadspark Groningen", province: "Groningen", type: "bos", lat: 53.213, lng: 6.545, radius: 1200, size: "± 55 ha", mechanism: "gemengd", desc: "Groot stadspark met bomen en water in de stad Groningen.", tip: "De oevers van de Papiersloot liggen vaak in de schaduw van oude bomenrijen." },
+
+  { name: "Bakkeveense Duinen", province: "Friesland", type: "bos", lat: 53.05, lng: 6.15, radius: 2500, size: "± 500 ha", mechanism: "schaduw", desc: "Bos- en heidegebied bij Bakkeveen in Zuidoost-Friesland.", tip: "De dennenbossen rond de vennen zijn merkbaar koeler dan de open zandpaden." },
+  { name: "De Alde Feanen", province: "Friesland", type: "water", lat: 53.13, lng: 5.97, radius: 4000, size: "± 2.500 ha", mechanism: "verdamping", desc: "Nationaal park met meren, moeras en rietland in Friesland.", tip: "Varen of kanoën tussen het riet voelt door het open water een stuk koeler dan wandelen op de wal." },
+
+  { name: "Sallandse Heuvelrug", province: "Overijssel", type: "bos", lat: 52.40, lng: 6.35, radius: 6000, size: "± 2.700 ha", mechanism: "schaduw", desc: "Bos en heide in Overijssel.", tip: "De beboste hellingen aan de noordkant blijven het langst koel in de middagzon." },
+  { name: "Weerribben-Wieden", province: "Overijssel", type: "water", lat: 52.77, lng: 5.95, radius: 8000, size: "± 6.000 ha", mechanism: "verdamping", desc: "Laagveenmoeras met plassen in Overijssel.", tip: "De smalle vaarten tussen het riet bieden zowel water als schaduw — een dubbel koel effect." },
+  { name: "Agnietenberg", province: "Overijssel", type: "bos", lat: 52.54, lng: 6.05, radius: 1500, size: "± 60 ha", mechanism: "schaduw", desc: "Bosgebied direct ten noorden van Zwolle.", tip: "Populair bij Zwollenaren op warme dagen vanwege de dichte, hoge boomkronen vlak bij de stad." },
+
+  { name: "Kuinderbos", province: "Flevoland", type: "bos", lat: 52.70, lng: 5.85, radius: 3000, size: "± 1.100 ha", mechanism: "schaduw", desc: "Groot productiebos in de Noordoostpolder.", tip: "De rechte lanen liggen grotendeels in de schaduw van hoog opgaand bos — ideaal voor een lange koele fietstocht." },
+  { name: "Oostvaardersplassen", province: "Flevoland", type: "water", lat: 52.44, lng: 5.38, radius: 5000, size: "± 3.600 ha", mechanism: "verdamping", desc: "Groot moeras- en watergebied bij Almere/Lelystad.", tip: "De uitkijkpunten aan de randen liggen vaak in de wind vanaf het open water." },
+
+  { name: "Amsterdamse Waterleidingduinen", province: "Noord-Holland", type: "duin", lat: 52.33, lng: 4.57, radius: 5000, size: "± 3.400 ha", mechanism: "gemengd", desc: "Duingebied tussen Zandvoort en Noordwijk.", tip: "De beboste binnenduinrand is koeler dan de kale zeereep, die vol in de zon ligt." },
+  { name: "Kennemerduinen", province: "Noord-Holland", type: "duin", lat: 52.42, lng: 4.58, radius: 4500, size: "± 1.400 ha", mechanism: "gemengd", desc: "Duingebied bij Bloemendaal en Overveen.", tip: "Zoek de dennenbosjes in het binnenduin op; de open duinvalleien warmen snel op." },
+  { name: "Schoorlse Duinen", province: "Noord-Holland", type: "duin", lat: 52.72, lng: 4.68, radius: 4500, size: "± 3.400 ha", mechanism: "gemengd", desc: "Bosrijk duingebied in Noord-Holland.", tip: "Dit is een van de meest beboste duingebieden van Nederland — meer schaduw dan kale kustduinen." },
+  { name: "Twiske", province: "Noord-Holland", type: "water", lat: 52.44, lng: 4.90, radius: 3000, size: "± 640 ha", mechanism: "verdamping", desc: "Recreatiegebied met water en groen, ten noorden van Amsterdam.", tip: "De oevers aan de noordkant liggen vaker in de schaduw van rietkragen en bomenrijen." },
+  { name: "Naardermeer", province: "Noord-Holland", type: "water", lat: 52.30, lng: 5.13, radius: 3000, size: "± 700 ha", mechanism: "verdamping", desc: "Oudste natuurreservaat van Nederland, moeras en water.", tip: "Alleen toegankelijk via excursie, maar de moerasvegetatie zorgt voor sterke lokale verkoeling." },
+  { name: "Amsterdamse Bos", province: "Noord-Holland", type: "bos", lat: 52.32, lng: 4.83, radius: 2500, size: "± 1.000 ha", mechanism: "gemengd", desc: "Groot stadsbos ten zuiden van Amsterdam.", tip: "De combinatie van bos én de Bosbaan (roeiwater) geeft hier zowel schaduw als verdamping." },
+  { name: "Spaarnwoude", province: "Noord-Holland", type: "water", lat: 52.40, lng: 4.70, radius: 3500, size: "± 1.000 ha", mechanism: "gemengd", desc: "Recreatiegebied met bos, water en heide tussen Haarlem en Amsterdam.", tip: "De aangeplante bossingels rond de plassen bieden meer schaduw dan de open grasvelden." },
+  { name: "Alkmaardermeer", province: "Noord-Holland", type: "water", lat: 52.53, lng: 4.78, radius: 2500, size: "± 500 ha", mechanism: "verdamping", desc: "Meer tussen Alkmaar en Uitgeest.", tip: "De westoever vangt meestal de meeste wind vanaf het water." },
+
+  { name: "Kralingse Bos", province: "Zuid-Holland", type: "water", lat: 51.93, lng: 4.51, radius: 1800, size: "± 200 ha", mechanism: "gemengd", desc: "Park met grote plas in Rotterdam.", tip: "De noordoever onder de bomen is aanmerkelijk koeler dan de open grasvelden aan de zuidkant." },
+  { name: "Haagse Bos / Bezuidenhout", province: "Zuid-Holland", type: "bos", lat: 52.09, lng: 4.32, radius: 1800, size: "± 180 ha", mechanism: "schaduw", desc: "Stadsbos in Den Haag.", tip: "Compact maar dicht bebost — een van de weinige echt schaduwrijke plekken binnen de Haagse ring." },
+  { name: "Meijendel", province: "Zuid-Holland", type: "duin", lat: 52.13, lng: 4.33, radius: 3500, size: "± 1.800 ha", mechanism: "gemengd", desc: "Duingebied bij Wassenaar, waterwingebied van Den Haag.", tip: "De beboste duinvalleien in het middengebied zijn koeler dan de open duintoppen." },
+  { name: "Reeuwijkse Plassen", province: "Zuid-Holland", type: "water", lat: 52.04, lng: 4.72, radius: 2500, size: "± 700 ha", mechanism: "verdamping", desc: "Veenplassengebied bij Reeuwijk en Gouda.", tip: "Smalle vaarten tussen rietkragen geven meer schaduw dan de brede open plassen." },
+  { name: "Oostvoornse Meer", province: "Zuid-Holland", type: "water", lat: 51.92, lng: 4.10, radius: 2000, size: "± 200 ha", mechanism: "verdamping", desc: "Zoutwatermeer op Voorne, ontstaan na de Deltawerken.", tip: "Zeewind zorgt hier meestal voor een merkbaar koeler klimaat dan verder landinwaarts." },
+
+  { name: "Manteling van Walcheren", province: "Zeeland", type: "duin", lat: 51.58, lng: 3.55, radius: 3500, size: "± 400 ha", mechanism: "gemengd", desc: "Bosrijk duingebied bij Domburg en Oostkapelle in Zeeland.", tip: "Een van de weinige plekken in Zeeland met echt bos tussen de duinen — meer schaduw dan de kale kust." },
+  { name: "Oranjezon", province: "Zeeland", type: "duin", lat: 51.60, lng: 3.62, radius: 1500, size: "± 200 ha", mechanism: "gemengd", desc: "Duingebied bij Vrouwenpolder met vennen en bos.", tip: "De vennen middenin het gebied zorgen voor extra verkoeling ten opzichte van de kale zeereep." },
+  { name: "Veerse Meer", province: "Zeeland", type: "water", lat: 51.55, lng: 3.85, radius: 5000, size: "± 2.100 ha", mechanism: "verdamping", desc: "Groot afgesloten meer tussen Walcheren, Noord- en Zuid-Beveland.", tip: "De noordoever bij Veere ligt vaker uit de wind dan de zuidoever." },
+
+  { name: "Loonse en Drunense Duinen", province: "Noord-Brabant", type: "duin", lat: 51.63, lng: 5.10, radius: 5000, size: "± 800 ha", mechanism: "gemengd", desc: "Bijzonder stuifzandgebied in Noord-Brabant.", tip: "Het open zand kan flink opwarmen; de bosranden eromheen bieden meer verkoeling dan het middengebied." },
+  { name: "Groote Peel", province: "Noord-Brabant/Limburg", type: "bos", lat: 51.35, lng: 5.75, radius: 4000, size: "± 1.400 ha", mechanism: "gemengd", desc: "Hoogveengebied op de grens van Brabant en Limburg.", tip: "Vroeg op de dag is het veen nog vochtig en koel; later warmen de open delen snel op." },
+  { name: "Brabantse Wal", province: "Noord-Brabant", type: "bos", lat: 51.45, lng: 4.35, radius: 5500, size: "± 2.500 ha", mechanism: "schaduw", desc: "Bosgebied op de hoge zandrug tussen Bergen op Zoom en de Belgische grens.", tip: "De hoogteligging zorgt voor iets meer luchtcirculatie dan in de omliggende polders." },
+  { name: "Biesbosch", province: "Noord-Brabant/Zuid-Holland", type: "water", lat: 51.75, lng: 4.80, radius: 9000, size: "± 9.000 ha", mechanism: "verdamping", desc: "Uitgestrekt getijdenmoeras en nationaal park.", tip: "Vaarroutes tussen de kreken voelen door het open water vaak enkele graden koeler dan de wal." },
+  { name: "Kampina", province: "Noord-Brabant", type: "bos", lat: 51.58, lng: 5.20, radius: 3000, size: "± 1.100 ha", mechanism: "gemengd", desc: "Heide-, bos- en vennengebied bij Oisterwijk, onderdeel van de Oisterwijkse Bossen en Vennen.", tip: "De vennen tussen de bossen zorgen voor extra verkoeling ten opzichte van de open heidevelden." },
+
+  { name: "Nationaal Park De Meinweg", province: "Limburg", type: "bos", lat: 51.16, lng: 6.07, radius: 4500, size: "± 1.800 ha", mechanism: "schaduw", desc: "Bosgebied in Limburg.", tip: "De beekdalen (o.a. de Roode Beek) zijn merkbaar koeler dan de hoger gelegen bospercelen." },
+  { name: "Maasduinen", province: "Limburg", type: "duin", lat: 51.48, lng: 6.05, radius: 6000, size: "± 1.900 ha", mechanism: "gemengd", desc: "Rivierduinen langs de Maas in Limburg.", tip: "Combineer een wandeling met de oevers van de Maas voor extra verkoeling door het water." }
 ];
 
 const styles = {
@@ -914,6 +985,11 @@ const styles = {
   duin:  { fill: "#A9762F", line: "#A9762F" }
 };
 const labels = { bos: "Bos / natuurgebied", water: "Groot water / plas", duin: "Duingebied" };
+const mechanismLabels = {
+  schaduw: "❃ Vooral schaduw door bomen",
+  verdamping: "❉ Vooral verkoeling door water",
+  gemengd: "❃❉ Schaduw én water/vocht"
+};
 
 const map = L.map('map', { zoomControl: true }).setView([52.2, 5.5], 7);
 
@@ -923,9 +999,13 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 19
 }).addTo(map);
 
-const layerGroups = { bos: L.layerGroup().addTo(map), water: L.layerGroup().addTo(map), duin: L.layerGroup().addTo(map) };
+// State
+const activeTypes = new Set(Object.keys(labels));
+let activeProvince = "alle";
+let searchQuery = "";
 
-spots.forEach(s => {
+// Maak voor elke plek een marker aan en bewaar ‘m samen met zijn data
+const markers = spots.map(s => {
   const st = styles[s.type];
   const circle = L.circle([s.lat, s.lng], {
     radius: s.radius,
@@ -936,24 +1016,86 @@ spots.forEach(s => {
   });
   circle.bindPopup(`
     <div class="popup-title">${s.name}</div>
-    <div class="popup-type">${labels[s.type]}</div>
+    <div class="popup-type">${labels[s.type]} · ${s.province} · ${s.size}</div>
     <div class="popup-desc">${s.desc}</div>
-  `);
-  circle.addTo(layerGroups[s.type]);
+    <div class="popup-mechanism">${mechanismLabels[s.mechanism]}</div>
+    <div class="popup-tip"><strong>Tip:</strong> ${s.tip}</div>
+  `, { maxWidth: 280 });
+  return { spot: s, marker: circle };
 });
 
+function matchesFilters(s) {
+  if (!activeTypes.has(s.type)) return false;
+  if (activeProvince !== "alle" && !s.province.includes(activeProvince)) return false;
+  if (searchQuery) {
+    const haystack = (s.name + " " + s.province + " " + s.desc).toLowerCase();
+    if (!haystack.includes(searchQuery)) return false;
+  }
+  return true;
+}
+
+function refresh() {
+  let count = 0;
+  markers.forEach(({ spot, marker }) => {
+    const show = matchesFilters(spot);
+    const onMap = map.hasLayer(marker);
+    if (show && !onMap) marker.addTo(map);
+    if (!show && onMap) map.removeLayer(marker);
+    if (show) count++;
+  });
+
+  document.getElementById('results-count').textContent = `${count} plek${count === 1 ? '' : 'ken'} gevonden`;
+
+  const listEl = document.getElementById('results-list');
+  listEl.innerHTML = '';
+  markers
+    .filter(({ spot }) => matchesFilters(spot))
+    .forEach(({ spot, marker }) => {
+      const card = document.createElement('button');
+      card.className = 'result-card';
+      card.innerHTML = `<div class="r-name">${spot.name}</div><div class="r-meta">${labels[spot.type]} · ${spot.province}</div>`;
+      card.addEventListener('click', () => {
+        map.setView([spot.lat, spot.lng], 11);
+        marker.openPopup();
+      });
+      listEl.appendChild(card);
+    });
+}
+
+// Filter-chips per categorie
 const filtersEl = document.getElementById('filters');
 Object.keys(labels).forEach(type => {
   const chip = document.createElement('div');
   chip.className = 'chip';
   chip.innerHTML = `<span class="dot" style="background:${styles[type].line}"></span>${labels[type]}`;
   chip.addEventListener('click', () => {
-    const active = chip.classList.toggle('off');
-    if (active) { map.removeLayer(layerGroups[type]); }
-    else { map.addLayer(layerGroups[type]); }
+    const off = chip.classList.toggle('off');
+    if (off) activeTypes.delete(type); else activeTypes.add(type);
+    refresh();
   });
   filtersEl.appendChild(chip);
 });
+
+// Provincie-select vullen
+const provinceSelect = document.getElementById('province-select');
+const allProvinces = [...new Set(spots.flatMap(s => s.province.split('/')))].sort();
+allProvinces.forEach(p => {
+  const opt = document.createElement('option');
+  opt.value = p; opt.textContent = p;
+  provinceSelect.appendChild(opt);
+});
+provinceSelect.addEventListener('change', () => {
+  activeProvince = provinceSelect.value;
+  refresh();
+});
+
+// Zoekbalk
+document.getElementById('search-box').addEventListener('input', (e) => {
+  searchQuery = e.target.value.trim().toLowerCase();
+  refresh();
+});
+
+refresh();
 
 // ---------------------------------------------------------------
 // Weer via Open-Meteo — geen account, geen sleutel nodig.
